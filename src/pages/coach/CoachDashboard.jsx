@@ -98,38 +98,40 @@ const fetchUsersFromAPI = async () => {
     if (response.ok) {
       const data = await response.json();
       const allUsers = data.data || [];
+      
+      // 1. Recuperamos IDs eliminados (la lista negra)
+      const deletedIds = JSON.parse(localStorage.getItem("deletedUsers") || "[]");
 
-      console.log("Usuarios recibidos del servidor:", allUsers);
-
+      // 2. Filtro estricto
       const filteredUsers = allUsers.filter(u => {
-        if (!u || !u.role || !u.email) return false;
+        // Que tenga ID, email y rol
+        if (!u || !u.id || !u.email || !u.role) return false;
+        
+        // Comprobar si el usuario es "dante" o tiene ID 12
+        const isDante = u.id === 12 || u.full_name?.toLowerCase() === 'dante';
+        
+        // Comprobar si está en la lista negra local
+        const isDeleted = deletedIds.includes(u.id);
+        
+        // Comprobar si el email marca suspensión
+        const isSuspended = u.email.includes("suspendido_");
         
         const role = u.role.toString().toLowerCase().trim();
-        
-        // FILTRO CLAVE: Solo roles 'user' o 'socio' Y que NO estén suspendidos
-        return (role === "user" || role === "socio") && !u.email.includes("suspendido_");
+        const isUserRole = (role === "user" || role === "socio");
+
+        // SOLO pasa si es rol de usuario, NO está suspendido, NO está en lista negra Y NO es Dante
+        return isUserRole && !isSuspended && !isDeleted && !isDante;
       });
 
-      const clientsOnly = filteredUsers.map(u => ({
+      console.log("Usuarios FINAL filtrados:", filteredUsers);
+      
+      setAvailableUsers(filteredUsers.map(u => ({
         ...u,
         name: u.full_name || u.name || "Sin nombre"
-      }));
-
-      console.log("Usuarios listos para el dashboard:", clientsOnly);
-      setAvailableUsers(clientsOnly);
-    } else if (response.status === 403) {
-    
-      console.warn("Acceso restringido a usuarios (403). Cargando socios precargados del sistema.");
-      
-      const defaultSocios = [
-        { id: 1, name: "Demo User 1", email: "user1@demo.cl", role: "user" },
-        { id: 2, name: "Demo User 2", email: "user2@demo.cl", role: "user" }
-      ];
-      
-      setAvailableUsers(defaultSocios);
+      })));
     }
   } catch (error) {
-    console.error("Error al cargar usuarios desde el servidor:", error);
+    console.error("Error:", error);
   }
 };
 
@@ -370,31 +372,38 @@ useEffect(() => {
         )}
 
         <Row className="mb-4">
-          <Col md={4}>
-            <Card className="border-0 shadow-sm bg-white border-start border-4 border-dark h-100">
-              <Card.Body className="py-3 d-flex flex-column justify-content-center">
-                <h6 className="text-muted text-uppercase small fw-bold mb-1">Alumnos Asignados</h6>
-                <h3 className="fw-bold text-dark mb-0">✨ {availableUsers.length} Atletas</h3>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col md={4}>
-            <Card className="border-0 shadow-sm bg-white border-start border-4 border-success h-100">
-              <Card.Body className="py-3 d-flex flex-column justify-content-center">
-                <h6 className="text-muted text-uppercase small fw-bold mb-1">Enfoque Principal</h6>
-                <h3 className="fw-bold text-success mb-0">💪 Hipertrofia / Fuerza</h3>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col md={4}>
-            <Card className="border-0 shadow-sm bg-white border-start border-4 border-primary h-100">
-              <Card.Body className="py-3 d-flex flex-column justify-content-center">
-                <h6 className="text-muted text-uppercase small fw-bold mb-1">Estado de Fichas</h6>
-                <h3 className="fw-bold text-primary mb-0">🛡️ 100% Actualizadas</h3>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
+  {/* Alumnos Asignados: Usamos availableUsers.length */}
+  <Col md={4}>
+    <Card className="border-0 shadow-sm bg-white border-start border-4 border-dark h-100">
+      <Card.Body className="py-3 d-flex flex-column justify-content-center">
+        <h6 className="text-muted text-uppercase small fw-bold mb-1">Alumnos Asignados</h6>
+        <h3 className="fw-bold text-dark mb-0">✨ {availableUsers.length} Atletas</h3>
+      </Card.Body>
+    </Card>
+  </Col>
+
+  {/* Enfoque: Calculamos cuántos tienen un objetivo definido */}
+  <Col md={4}>
+    <Card className="border-0 shadow-sm bg-white border-start border-4 border-success h-100">
+      <Card.Body className="py-3 d-flex flex-column justify-content-center">
+        <h6 className="text-muted text-uppercase small fw-bold mb-1">Con Planificación</h6>
+        <h3 className="fw-bold text-success mb-0">
+          💪 {routinesList.length} Planes Activos
+        </h3>
+      </Card.Body>
+    </Card>
+  </Col>
+
+  {/* Estado de Fichas: Basado en el total de usuarios */}
+  <Col md={4}>
+    <Card className="border-0 shadow-sm bg-white border-start border-4 border-primary h-100">
+      <Card.Body className="py-3 d-flex flex-column justify-content-center">
+        <h6 className="text-muted text-uppercase small fw-bold mb-1">Estado de Fichas</h6>
+        <h3 className="fw-bold text-primary mb-0">🛡️ {availableUsers.length > 0 ? "100%" : "0%"} Actualizadas</h3>
+      </Card.Body>
+    </Card>
+  </Col>
+</Row>
 
         <Card className="shadow border-0 rounded-3 overflow-hidden">
           <Card.Header className="bg-white py-3 border-0">
