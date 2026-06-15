@@ -9,6 +9,8 @@ import UserDashboard from "../pages/user/UserDashboard"
 import CoachDashboard from "../pages/coach/CoachDashboard"
 import AdminDashboard from "../pages/admin/AdminDashboard"
 
+import SportsDashboard from "../pages/admin/SportsDashboard"
+
 import UserLayout from "../layouts/UserLayout"
 import CoachLayout from "../layouts/CoachLayout"
 import AdminLayout from "../layouts/AdminLayout"
@@ -41,8 +43,9 @@ function AppRoutes() {
       </Route>
 
       <Route path="/admin" element={<RoleRoute allowedRoles={["admin"]}><AdminLayout /></RoleRoute>}>
-        <Route path="dashboard" element={<AdminDashboard />} />
-      </Route>
+  <Route path="dashboard" element={<AdminDashboard />} />
+  <Route path="sports" element={<SportsDashboard />} /> {/* <--- AGREGA ESTA LÍNEA */}
+</Route>
 
       <Route path="/perfil" element={<ProtectedRoute><div className="container mt-4"><h1>Perfil del usuario autenticado</h1></div></ProtectedRoute>} />
 

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Table, Button, Modal, Form, Badge, Card, Container, Row, Col, Navbar, Nav } from "react-bootstrap";
+import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { getUser, getHeaders, logout } from "../../services/authService";
 
 function AdminDashboard() {
+  const navigate = useNavigate();
   const [usersList, setUsersList] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -14,54 +16,50 @@ function AdminDashboard() {
 
   const API_URL = "http://localhost:3000/api/users";
 
-  useEffect(() => {
-    const checkSession = () => {
-      const userSession = getUser();
-      if (!userSession || userSession.role !== "admin") {
-        window.location.replace("/login");
-      } else {
-        setAdminName(userSession.name); 
+  // Función para obtener usuarios (definida fuera del useEffect para poder llamarla después)
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch(API_URL, { headers: getHeaders() });
+      if (response.ok) {
+        const data = await response.json();
+        const allUsers = data.data || [];
+        const deletedIds = JSON.parse(localStorage.getItem("deletedUsers") || "[]");
+        const visibleUsers = allUsers.filter(user => 
+          !deletedIds.includes(user.id) && 
+          user.email && !user.email.includes("suspendido_")
+        );
+        setUsersList(visibleUsers); 
       }
-    };
-    checkSession();
-    
-    const fetchUsers = async () => {
-  try {
-    const response = await fetch(API_URL, { headers: getHeaders() });
-    if (response.ok) {
-      const data = await response.json();
-      const allUsers = data.data || [];
-      
-      
-      const deletedIds = JSON.parse(localStorage.getItem("deletedUsers") || "[]");
-      
-      
-      const visibleUsers = allUsers.filter(user => 
-        !deletedIds.includes(user.id) && 
-        user.email && !user.email.includes("suspendido_")
-      );
-      
-      setUsersList(visibleUsers); 
+    } catch (error) {
+      console.error("Error al cargar usuarios:", error);
     }
-  } catch (error) {
-    console.error("Error al cargar usuarios:", error);
-  }
-};
-    fetchUsers();
-    
-    const handlePageShow = (event) => {
-      if (event.persisted) {
-        window.location.reload();
-      } else {
-        checkSession();
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      const userSession = getUser();
+      
+     
+      if (!userSession) {
+        window.location.replace("/login");
+        return;
       }
-    };
+      
     
-    window.addEventListener("pageshow", handlePageShow);
-    return () => {
-      window.removeEventListener("pageshow", handlePageShow);
+      if (userSession.role !== "admin") {
+        window.location.replace("/unauthorized");
+        return;
+      }
+
+    
+      setAdminName(userSession.name);
+      await fetchUsers(); 
     };
-  }, []);
+
+    init();
+  }, []); 
+
+ 
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -327,16 +325,30 @@ const handleDeleteUser = async (id, name) => {
 
       <Container fluid className="px-4">
         <div className="text-white p-4 rounded-4 shadow-sm mb-4 d-flex justify-content-between align-items-center" style={{ backgroundImage: "linear-gradient(45deg, #dc3545, #7a1527)" }}>
-          <div>
-            <h2 className="fw-bold mb-1">Consola del Administrador</h2>
-            <p className="mb-0 text-white-50">Gestión de credenciales, seguridad y control de acceso global del club</p>
-          </div>
-          <div>
-            <Button variant="light" className="fw-bold shadow-sm px-4 py-2 rounded-pill text-danger text-uppercase small" onClick={handleOpenCreateModal}>
-              + Registrar Usuario
-            </Button>
-          </div>
-        </div>
+  <div>
+    <h2 className="fw-bold mb-1">Consola del Administrador</h2>
+    <p className="mb-0 text-white-50">Gestión de credenciales, seguridad y control de acceso global del club</p>
+  </div>
+  
+  {/* Aquí van ambos botones */}
+  <div className="d-flex gap-2">
+    <Button 
+      variant="outline-light" 
+      className="fw-bold shadow-sm px-4 py-2 rounded-pill text-white text-uppercase small" 
+      onClick={() => navigate('/admin/sports')}
+    >
+      Gestión Deportes
+    </Button>
+    
+    <Button 
+      variant="light" 
+      className="fw-bold shadow-sm px-4 py-2 rounded-pill text-danger text-uppercase small" 
+      onClick={handleOpenCreateModal}
+    >
+      + Registrar Usuario
+    </Button>
+  </div>
+</div>
 
         <Row className="g-4 mb-4 text-center">
           <Col md={3}>
