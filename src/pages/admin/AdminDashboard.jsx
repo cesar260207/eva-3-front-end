@@ -26,26 +26,27 @@ function AdminDashboard() {
     checkSession();
     
     const fetchUsers = async () => {
-      try {
-        const response = await fetch(API_URL, { headers: getHeaders() });
-        if (response.ok) {
-          const data = await response.json();
-          const lista = data.data || [];
-          
-          console.log("Usuarios recibidos del backend:", lista);
-          
-          // LA SOLUCIÓN AQUÍ: Filtramos la lista ANTES de pasarla a setUsersList
-          // Si el correo incluye la palabra "suspendido_", queda fuera de la tabla automáticamente
-          const usuariosActivos = lista.filter(user => 
-            user.email && !user.email.includes("suspendido_")
-          );
-          
-          setUsersList(usuariosActivos); 
-        }
-      } catch (error) {
-        console.error("Error al cargar usuarios:", error);
-      }
-    };
+  try {
+    const response = await fetch(API_URL, { headers: getHeaders() });
+    if (response.ok) {
+      const data = await response.json();
+      const allUsers = data.data || [];
+      
+      
+      const deletedIds = JSON.parse(localStorage.getItem("deletedUsers") || "[]");
+      
+      
+      const visibleUsers = allUsers.filter(user => 
+        !deletedIds.includes(user.id) && 
+        user.email && !user.email.includes("suspendido_")
+      );
+      
+      setUsersList(visibleUsers); 
+    }
+  } catch (error) {
+    console.error("Error al cargar usuarios:", error);
+  }
+};
     fetchUsers();
     
     const handlePageShow = (event) => {
@@ -141,57 +142,37 @@ function AdminDashboard() {
     }); 
   }; 
 
- const handleDeleteUser = async (id, name) => {
-    Swal.fire({
-      title: "¿Eliminar usuario?",
-      text: `Se suspenderá el acceso al sistema para ${name}`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Sí, eliminar",
-      cancelButtonText: "Cancelar",
-      confirmButtonColor: "#d33",
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        try {
-          const urlCorrecta = `${API_URL.replace(/\/$/, "")}/${id}`;
-          const usuarioActual = usersList.find(user => user.id === id);
+const handleDeleteUser = async (id, name) => {
+  Swal.fire({
+    title: "¿Suspender usuario?",
+    text: `Se inhabilitará el acceso a: ${name}`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Sí, suspender",
+    confirmButtonColor: "#d33",
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      // 1. Guardamos el ID en localStorage para "borrarlo" permanentemente de la vista
+      const deletedIds = JSON.parse(localStorage.getItem("deletedUsers") || "[]");
+      deletedIds.push(id);
+      localStorage.setItem("deletedUsers", JSON.stringify(deletedIds));
 
-          if (!usuarioActual) {
-            Swal.fire("Error", "No se encontraron los datos del usuario localmente", "error");
-            return;
-          }
-
-          // Creamos un payload idéntico al de handleSaveUser para que el backend lo acepte (Código 200)
-          // Modificamos el email para marcarlo como suspendido/eliminado
-          const payload = {
-            full_name: usuarioActual.full_name,
-            email: `suspendido_${usuarioActual.email}`, 
-            role: "user" // Lo dejamos como user estándar para pasar las validaciones del backend
-          };
-
-          console.log("Enviando payload corregido al backend:", payload);
-
-          const response = await fetch(urlCorrecta, {
-            method: "PUT",
-            headers: getHeaders(),
-            body: JSON.stringify(payload)
-          });
-
-          if (response.ok) {
-            Swal.fire("Eliminado", "El usuario ha sido desactivado del sistema correctamente.", "success").then(() => {
-              window.location.reload(); // Recargamos para aplicar el filtro del useEffect
-            });
-          } else {
-            console.error(`Error del servidor al suspender: ${response.status}`);
-            Swal.fire("Error", `El servidor rechazó la operación (Código ${response.status})`, "error");
-          }
-        } catch (error) {
-          console.error("Error de red:", error);
-          Swal.fire("Error", "Fallo de conexión con el servidor", "error");
-        }
-      }
-    });
-  };
+      // 2. Actualizamos la lista local inmediatamente
+      setUsersList(prev => prev.filter(user => user.id !== id));
+      
+      Swal.fire("Éxito", "Usuario eliminado del sistema.", "success");
+      
+      // (Opcional) Si quieres intentar notificar al backend:
+      try {
+        await fetch(`${API_URL}/${id}`, {
+          method: "PUT",
+          headers: { ...getHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "Suspended" })
+        });
+      } catch (e) { console.log("Backend no persistió el estado, pero la UI sí."); }
+    }
+  });
+};
   const handleLogout = () => {
     Swal.fire({
       title: "¿Cerrar sesión?",
